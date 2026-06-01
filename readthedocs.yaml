@@ -1,0 +1,25 @@
+# Read the Docs configuration for the ACL Symposium project browser.
+# This is a fully static site — no Sphinx, no MkDocs, just HTML/CSS/JS.
+# We use the build.commands escape hatch to copy our pre-built files
+# into the directory RTD serves from.
+#
+# Hosted at: https://<your-project-slug>.readthedocs.io/
+#
+# Repo layout expected:
+#   .readthedocs.yaml   <- this file
+#   site/
+#     index.html
+#     (any other static assets, e.g. data.json, images/, etc.)
+
+version: 2
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.12"   # required by RTD even though we don't use it
+  commands:
+    - mkdir -p $READTHEDOCS_OUTPUT/html
+    - cp -r site/* $READTHEDOCS_OUTPUT/html/
+
+# We do NOT set `sphinx:` or `mkdocs:` here — those would conflict
+# with `build.commands` and RTD will reject the config.

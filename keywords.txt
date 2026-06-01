@@ -1,0 +1,19 @@
+Machine Learning
+Simulation
+Computational Biology
+Computer Vision
+Molecular Docking
+Drosophila Model
+Other Animal Model
+Cell Culture
+Microbiology
+PCR / Sequencing
+Protein / Enzyme Assay
+Drug Screening / Pharmacology
+Synthesis
+Spectroscopy
+Materials Testing
+3D Printing / Fabrication
+Field Study
+Remote Sensing / GIS
+Behavioral Assay
