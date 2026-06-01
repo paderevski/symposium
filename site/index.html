@@ -426,9 +426,9 @@
 const LIVE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv";
 const CACHE_KEY = "symposium-projects-cache-v2";
 const BOOKMARKS_KEY = "symposium-project-bookmarks-v1";
-const ASSET_ROOTS = {
-  paper: "../Papers/",
-  poster: "../Posters/",
+const ASSET_DIRS = {
+  paper: "Papers",
+  poster: "Posters",
 };
 const assetAvailability = new Map();
 const pendingAssetChecks = new Set();
@@ -506,7 +506,17 @@ function buildAssetHref(kind, value, project) {
   const ref = normalizeAssetReference(value, kind, project);
   if (!ref) return "";
   if (/^(https?:)?\/\//i.test(ref)) return ref;
-  return `${ASSET_ROOTS[kind]}${ref.split("/").map(encodeURIComponent).join("/")}`;
+  const pathParts = ref.split("/").map(encodeURIComponent).join("/");
+  const assetDir = ASSET_DIRS[kind];
+  const pathname = window.location.pathname || "/";
+  const docsBaseMatch = pathname.match(/^\/(en|[a-z]{2}(?:-[A-Z]{2})?)\/([^/]+)(?:\/|$)/);
+  if (docsBaseMatch) {
+    return `/${docsBaseMatch[1]}/${docsBaseMatch[2]}/${assetDir}/${pathParts}`;
+  }
+  if (window.location.protocol === 'file:') {
+    return `../${assetDir}/${pathParts}`;
+  }
+  return `/${assetDir}/${pathParts}`;
 }
 
 function rowsToProjects(rows) {
