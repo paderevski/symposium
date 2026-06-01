@@ -202,9 +202,14 @@
     padding: 22px 0; border-top: 1px solid var(--border);
   }
   li.project:last-child { border-bottom: 1px solid var(--border); }
+  .project-main { min-width: 0; }
   .pcode {
     font-family: var(--sans); font-size: 14px; font-weight: 700;
     color: var(--accent); letter-spacing: 0.04em; padding-top: 2px;
+  }
+  .project-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px;
   }
   .meta {
     font-family: var(--sans); font-size: 11px; font-weight: 700;
@@ -219,6 +224,25 @@
     font-family: var(--serif); font-size: 19px; font-weight: 700;
     line-height: 1.28; margin: 0 0 6px; color: var(--text);
   }
+  .bookmark-btn {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; padding: 0;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--bg); color: var(--muted);
+    cursor: pointer; transition: all 120ms;
+  }
+  .bookmark-btn:hover {
+    color: var(--accent); border-color: var(--accent-soft2); background: var(--accent-soft);
+  }
+  .bookmark-btn.active {
+    color: var(--accent); border-color: var(--accent-soft2); background: var(--accent-bg);
+  }
+  .bookmark-btn svg {
+    width: 16px; height: 16px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+  }
+  .bookmark-btn.active svg { fill: currentColor; }
   .pauthors {
     font-family: var(--sans); font-size: 12px; font-weight: 700;
     letter-spacing: 0.08em; color: var(--accent);
@@ -280,7 +304,7 @@
 <header class="site">
   <p class="eyebrow">The Academies of Loudoun · Research Symposium</p>
   <div class="header-row">
-    <h1 class="title">Senior Research <span class="it">Symposium</span> 2026</h1>
+    <h1 class="title">Research <span class="it">Symposium</span> 2026</h1>
     <button class="status" id="data-status" title="Click to fetch fresh data from the live sheet">
       <span class="dot"></span><span class="label">snapshot</span>
     </button>
@@ -301,6 +325,14 @@
 
 <div class="layout">
   <aside class="filters">
+    <div class="facet-group" id="saved-group">
+      <div class="facet-label">
+        <span>Saved</span>
+        <button class="facet-clear hidden" data-group="saved">clear</button>
+      </div>
+      <div class="facet-list" id="saved-list"></div>
+    </div>
+
     <div class="facet-group" id="cat-group">
       <div class="facet-label">
         <span>Category</span>
@@ -358,16 +390,19 @@
 
 const LIVE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv";
 const CACHE_KEY = "symposium-projects-cache-v1";
+const BOOKMARKS_KEY = "symposium-project-bookmarks-v1";
 let PROJECTS = [];
 
 const state = {
   search: "",
+  saved: new Set(),
   cats: new Set(),
   teachers: new Set(),
   rooms: new Set(),
   divs: new Set(),
   keywords: new Set(),
   expanded: new Set(),
+  bookmarkedCodes: new Set(),
   isLoading: true,
   loadError: null,
   sortBy: "project_code",  // project_code | title | category | last_name | room
@@ -478,6 +513,28 @@ function loadCachedProjects() {
   }
 }
 
+function loadBookmarkedCodes() {
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBookmarkedCodes(bookmarkedCodes) {
+  try {
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarkedCodes]));
+  } catch {}
+}
+
+function isBookmarked(project) {
+  return state.bookmarkedCodes.has(project.project_code);
+}
+
 function saveCachedProjects(projects) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
@@ -581,12 +638,14 @@ function highlight(text, query) {
 }
 
 function matchesProject(p, ignoreGroup = null) {
+  const saved = ignoreGroup === 'saved' ? null : state.saved;
   const cats = ignoreGroup === 'cat' ? null : state.cats;
   const teachers = ignoreGroup === 'teacher' ? null : state.teachers;
   const rooms = ignoreGroup === 'room' ? null : state.rooms;
   const divs = ignoreGroup === 'div' ? null : state.divs;
   const keywords = ignoreGroup === 'keyword' ? null : state.keywords;
 
+  if (saved && saved.size && !isBookmarked(p)) return false;
   if (cats && cats.size && !cats.has(p.category)) return false;
   if (teachers && teachers.size && !teachers.has(p.teacher)) return false;
   if (rooms && rooms.size && !rooms.has(p.room)) return false;
@@ -662,7 +721,9 @@ function renderFacets() {
   const buildCounts = (projects) => {
     const catCounts = {}, teacherCounts = {}, roomCounts = {}, divCounts = {}, keywordCounts = {};
     let noneCount = 0;
+    let savedCount = 0;
     projects.forEach(p => {
+      if (isBookmarked(p)) savedCount++;
       catCounts[p.category] = (catCounts[p.category] || 0) + 1;
       if (p.teacher) teacherCounts[p.teacher] = (teacherCounts[p.teacher] || 0) + 1;
       if (p.room) roomCounts[p.room] = (roomCounts[p.room] || 0) + 1;
@@ -670,9 +731,10 @@ function renderFacets() {
       if (p.keywords.length === 0) noneCount++;
       else p.keywords.forEach(keyword => { keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1; });
     });
-    return { catCounts, teacherCounts, roomCounts, divCounts, keywordCounts, noneCount };
+    return { catCounts, teacherCounts, roomCounts, divCounts, keywordCounts, noneCount, savedCount };
   };
 
+  const savedFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'saved')));
   const catFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'cat')));
   const roomFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'room')));
   const divFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'div')));
@@ -680,6 +742,10 @@ function renderFacets() {
   const keywordFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'keyword')));
 
   const allCounts = buildCounts(PROJECTS);
+
+  renderFacetGroup('saved-list', [{
+    value: 'saved', label: 'Bookmarked', code: '', count: savedFacetCounts.savedCount || 0
+  }], state.saved, 'saved');
 
   // Categories — sorted alpha by name, code shown as prefix
   const cats = Object.keys(allCounts.catCounts).sort();
@@ -729,7 +795,8 @@ function joinWithOr(values) {
 }
 
 function getFilterSet(group) {
-  return group === "cat" ? state.cats
+  return group === "saved" ? state.saved
+    : group === "cat" ? state.cats
     : group === "teacher" ? state.teachers
     : group === "room" ? state.rooms
     : group === "div" ? state.divs
@@ -740,6 +807,7 @@ function renderActiveFilters() {
   const wrap = document.getElementById('active-filters');
   const pills = [];
 
+  if (state.saved.size) pills.push({ group: 'saved', label: 'Bookmarked' });
   if (state.cats.size) pills.push({ group: 'cat', label: joinWithOr([...state.cats].sort()) });
   if (state.teachers.size) pills.push({ group: 'teacher', label: joinWithOr([...state.teachers].sort()) });
   if (state.rooms.size) {
@@ -800,6 +868,7 @@ function renderProjects() {
 
   ul.innerHTML = sorted.map(p => {
     const expanded = state.expanded.has(p.project_code);
+    const bookmarked = isBookmarked(p);
     const gradeHTML = p.grade ? `<span class="grade">· Grade ${escapeHTML(p.grade)}</span>` : "";
     const teacherHTML = p.teacher ? `<span class="teacher">· ${escapeHTML(p.teacher)}</span>` : "";
     const keywordHTML = (p.keywords && p.keywords.length > 0)
@@ -810,7 +879,7 @@ function renderProjects() {
       : `<p class="pbrief" style="color:var(--muted);font-style:italic">No brief abstract.</p>`;
     return `<li class="project" id="proj-${escapeHTML(p.project_code)}">
       <div class="pcode">${highlight(p.project_code, q)}</div>
-      <div>
+      <div class="project-main">
         <p class="meta">
           ${p.category_code ? `<span class="ccode">${escapeHTML(p.category_code)}</span>` : ''}
           <span class="sep">·</span>
@@ -818,7 +887,12 @@ function renderProjects() {
           ${p.room ? `<span class="sep">·</span><span class="room">${escapeHTML(roomDisplay(p.room))}</span>` : ""}
           ${p.division ? `<span class="sep">·</span><span class="div">${escapeHTML(p.division)}</span>` : ""}
         </p>
-        <p class="ptitle">${highlight(p.title, q)}</p>
+        <div class="project-head">
+          <p class="ptitle">${highlight(p.title, q)}</p>
+          <button class="bookmark-btn ${bookmarked ? 'active' : ''}" data-bookmark="${escapeHTML(p.project_code)}" aria-pressed="${bookmarked ? 'true' : 'false'}" aria-label="${bookmarked ? 'Remove bookmark' : 'Save project'}">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 2.5h8a1 1 0 0 1 1 1V14l-5-3.2L3 14V3.5a1 1 0 0 1 1-1Z"></path></svg>
+          </button>
+        </div>
         <p class="pauthors">${highlight(authorsDisplay(p), q)} ${gradeHTML}${teacherHTML}</p>
         ${briefHTML}
         ${expanded && p.abstract ? `<div class="pfull">${highlight(p.abstract, q)}</div>` : ""}
@@ -848,6 +922,7 @@ $("#search").addEventListener("input", (e) => {
 
 $("#clear-all").addEventListener("click", () => {
   state.search = "";
+  state.saved.clear();
   state.cats.clear();
   state.teachers.clear();
   state.rooms.clear();
@@ -861,6 +936,15 @@ $("#clear-all").addEventListener("click", () => {
 $("#data-status").addEventListener("click", fetchLive);
 
 document.body.addEventListener("click", (e) => {
+  const bookmarkBtn = e.target.closest("[data-bookmark]");
+  if (bookmarkBtn) {
+    const projectCode = bookmarkBtn.dataset.bookmark;
+    if (state.bookmarkedCodes.has(projectCode)) state.bookmarkedCodes.delete(projectCode);
+    else state.bookmarkedCodes.add(projectCode);
+    saveBookmarkedCodes(state.bookmarkedCodes);
+    render();
+    return;
+  }
   const pillClear = e.target.closest(".filter-pill-clear");
   if (pillClear) {
     getFilterSet(pillClear.dataset.pillGroup).clear();
@@ -913,6 +997,7 @@ window.addEventListener('resize', updateStickyOffsets);
 // ============================================================
 // Boot
 // ============================================================
+state.bookmarkedCodes = loadBookmarkedCodes();
 const cachedProjects = loadCachedProjects();
 if (cachedProjects) {
   PROJECTS = cachedProjects.projects;
