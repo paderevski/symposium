@@ -1,10 +1,10 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ACL Research Symposium 2026 — Projects</title>
-<style>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>ACL Research Symposium 2026 — Projects</title>
+        <style>
   :root {
     --text: #1A1A1A;
     --accent: #1B365D;
@@ -257,6 +257,25 @@
     letter-spacing: 0.04em; text-transform: none; margin-left: 8px;
   }
   .pbrief { color: var(--text); margin: 0 0 8px; }
+  .passets {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin: 0 0 10px; color: var(--muted); font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+  .asset-link {
+    color: var(--muted); text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 120ms, border-color 120ms;
+  }
+  .asset-link:hover {
+    color: var(--accent);
+    border-color: var(--accent-soft2);
+  }
+  .asset-link.is-missing {
+    color: var(--muted); opacity: 0.68;
+    cursor: default;
+  }
+  .asset-sep { color: var(--border-strong); }
   .pfull {
     border-left: 2px solid var(--accent-soft2); padding-left: 14px;
     margin: 12px 0 8px; color: #2A2A2A; white-space: pre-wrap;
@@ -297,100 +316,122 @@
       padding-left: 18px; padding-right: 18px;
     }
   }
-</style>
-</head>
-<body>
+        </style>
+    </head>
+    <body>
 
-<header class="site">
-  <p class="eyebrow">The Academies of Loudoun · Research Symposium</p>
-  <div class="header-row">
-    <h1 class="title">Research <span class="it">Symposium</span> 2026</h1>
-    <button class="status" id="data-status" title="Click to fetch fresh data from the live sheet">
-      <span class="dot"></span><span class="label">snapshot</span>
-    </button>
-  </div>
-  <p class="sub">Browse student research projects. Search the bar; filter by category, teacher, room, division, or keywords.</p>
-  <hr class="accent-rule">
-</header>
+        <header class="site">
+            <p class="eyebrow">The Academies of Loudoun · Research Symposium</p>
+            <div class="header-row">
+                <h1 class="title">
+                    Research <span class="it">Symposium</span> 2026
+                </h1>
+                <button class="status"
+                        id="data-status"
+                        title="Click to fetch fresh data from the live sheet">
+                    <span class="dot"></span><span class="label">snapshot</span>
+                </button>
+            </div>
+            <p class="sub">
+                Browse student research projects. Search the bar; filter by category, teacher, room, division, or keywords.
+            </p>
+            <hr class="accent-rule">
+        </header>
 
-<section class="search-wrap">
-  <div class="search-bar">
-    <input type="search" id="search" class="search-input"
-           placeholder="Search projects by title, author, abstract, or topic…"
-           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    <button class="clear-btn" id="clear-all">Reset</button>
-  </div>
-  <div class="active-filters hidden" id="active-filters" aria-live="polite"></div>
-</section>
+        <section class="search-wrap">
+            <div class="search-bar">
+                <input type="search"
+                       id="search"
+                       class="search-input"
+                       placeholder="Search projects by title, author, abstract, or topic…"
+                       autocomplete="off"
+                       autocorrect="off"
+                       autocapitalize="off"
+                       spellcheck="false">
+                <button class="clear-btn" id="clear-all">Reset</button>
+            </div>
+            <div class="active-filters hidden" id="active-filters" aria-live="polite"></div>
+        </section>
 
-<div class="layout">
-  <aside class="filters">
-    <div class="facet-group" id="saved-group">
-      <div class="facet-label">
-        <span>Saved</span>
-        <button class="facet-clear hidden" data-group="saved">clear</button>
-      </div>
-      <div class="facet-list" id="saved-list"></div>
-    </div>
+        <div class="layout">
+            <aside class="filters">
+                <div class="facet-group" id="saved-group">
+                    <div class="facet-label">
+                        <span>Saved</span>
+                        <button class="facet-clear hidden" data-group="saved">clear</button>
+                    </div>
+                    <div class="facet-list" id="saved-list"></div>
+                </div>
 
-    <div class="facet-group" id="cat-group">
-      <div class="facet-label">
-        <span>Category</span>
-        <button class="facet-clear hidden" data-group="cat">clear</button>
-      </div>
-      <div class="facet-list" id="cat-list"></div>
-    </div>
+                <div class="facet-group" id="cat-group">
+                    <div class="facet-label">
+                        <span>Category</span>
+                        <button class="facet-clear hidden" data-group="cat">clear</button>
+                    </div>
+                    <div class="facet-list" id="cat-list"></div>
+                </div>
 
-    <div class="facet-group" id="keyword-group">
-      <div class="facet-label">
-        <span>Keywords</span>
-        <button class="facet-clear hidden" data-group="keyword">clear</button>
-      </div>
-      <div class="facet-list" id="keyword-list"></div>
-    </div>
-    <div class="facet-group" id="div-group">
-      <div class="facet-label">
-        <span>Division</span>
-        <button class="facet-clear hidden" data-group="div">clear</button>
-      </div>
-      <div class="facet-list" id="div-list"></div>
-    </div>
-    <div class="facet-group" id="teacher-group">
-      <div class="facet-label">
-        <span>Teacher</span>
-        <button class="facet-clear hidden" data-group="teacher">clear</button>
-      </div>
-      <div class="facet-list" id="teacher-list"></div>
-    </div>
-    <div class="facet-group" id="room-group">
-      <div class="facet-label">
-        <span>Room</span>
-        <button class="facet-clear hidden" data-group="room">clear</button>
-      </div>
-      <div class="facet-list" id="room-list"></div>
-    </div>
-  </aside>
+                <div class="facet-group" id="keyword-group">
+                    <div class="facet-label">
+                        <span>Keywords</span>
+                        <button class="facet-clear hidden" data-group="keyword">clear</button>
+                    </div>
+                    <div class="facet-list" id="keyword-list"></div>
+                </div>
+                <div class="facet-group" id="div-group">
+                    <div class="facet-label">
+                        <span>Division</span>
+                        <button class="facet-clear hidden" data-group="div">clear</button>
+                    </div>
+                    <div class="facet-list" id="div-list"></div>
+                </div>
+                <div class="facet-group" id="teacher-group">
+                    <div class="facet-label">
+                        <span>Teacher</span>
+                        <button class="facet-clear hidden" data-group="teacher">clear</button>
+                    </div>
+                    <div class="facet-list" id="teacher-list"></div>
+                </div>
+                <div class="facet-group" id="room-group">
+                    <div class="facet-label">
+                        <span>Room</span>
+                        <button class="facet-clear hidden" data-group="room">clear</button>
+                    </div>
+                    <div class="facet-list" id="room-list"></div>
+                </div>
+            </aside>
 
-  <main class="results">
-    <div class="count-row">
-      <div>Showing <em id="shown">0</em> of <em id="total">0</em> projects</div>
-      <button class="sort-control" id="sort-btn">Sort: Project #</button>
-    </div>
-    <ul class="projects" id="projects"></ul>
-  </main>
-</div>
+            <main class="results">
+                <div class="count-row">
+                    <div>
+                        Showing <em id="shown">0</em> of <em id="total">0</em> projects
+                    </div>
+                    <button class="sort-control" id="sort-btn">Sort: Project #</button>
+                </div>
+                <ul class="projects" id="projects">
+                </ul>
+            </main>
+        </div>
 
-<footer class="site">
-  Senior Research Symposium 2026 · The Academies of Loudoun ·
-  Data source: <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv" target="_blank" rel="noopener">live Google Sheet</a>
-</footer>
+        <footer class="site">
+            Senior Research Symposium 2026 · The Academies of Loudoun ·
+            Data source: <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv"
+    target="_blank"
+    rel="noopener">live Google Sheet</a>
+        </footer>
 
-<script>
+        <script>
 "use strict";
 
 const LIVE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv";
-const CACHE_KEY = "symposium-projects-cache-v1";
+const CACHE_KEY = "symposium-projects-cache-v2";
 const BOOKMARKS_KEY = "symposium-project-bookmarks-v1";
+const ASSET_ROOTS = {
+  paper: "../Papers/",
+  poster: "../Posters/",
+};
+const assetAvailability = new Map();
+const pendingAssetChecks = new Set();
 let PROJECTS = [];
 
 const state = {
@@ -433,6 +474,41 @@ function parseCSV(text) {
   return rows;
 }
 
+function slugAssetPart(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeAssetReference(value, kind, project) {
+  const raw = String(value || "").trim();
+  if (raw) {
+    if (/^(https?:)?\/\//i.test(raw)) return raw;
+    const filename = raw.split(/[?#]/, 1)[0].split("/").pop().trim();
+    if (!filename) return "";
+    const dot = filename.lastIndexOf(".");
+    const stem = dot >= 0 ? filename.slice(0, dot) : filename;
+    const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : "";
+    let normalized = `${slugAssetPart(stem)}${ext}`;
+    if (kind === "poster") normalized = normalized.replace(/\.png$/i, ".pdf");
+    if (!/\.[A-Za-z0-9]+$/.test(normalized)) normalized += ".pdf";
+    return normalized;
+  }
+  const first = slugAssetPart(project.first_name);
+  const last = slugAssetPart(project.last_name);
+  if (!first || !last) return "";
+  return `${first}_${last}.pdf`;
+}
+
+function buildAssetHref(kind, value, project) {
+  const ref = normalizeAssetReference(value, kind, project);
+  if (!ref) return "";
+  if (/^(https?:)?\/\//i.test(ref)) return ref;
+  return `${ASSET_ROOTS[kind]}${ref.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 function rowsToProjects(rows) {
   if (rows.length < 2) return [];
   const headers = rows[0].map(h => h.trim());
@@ -459,11 +535,16 @@ function rowsToProjects(rows) {
     const keywords = (!keywordRaw || keywordRaw.toLowerCase() === 'none')
       ? [] : keywordRaw.split(',').map(s => s.trim()).filter(Boolean);
     const uuid_raw = get(row, 'UUID');
+    const first_name = get(row, 'First Name*', 'First Name');
+    const last_name = get(row, 'Last Name*', 'Last Name');
+    const paper_link = get(row, 'Paper Link');
+    const poster_link = get(row, 'Poster Link');
+    const projectBase = { first_name, last_name };
     out.push({
       project_code,
       uuid: /^\d+(\.\d+)?$/.test(uuid_raw) ? parseInt(uuid_raw, 10) : uuid_raw,
-      first_name: get(row, 'First Name*', 'First Name'),
-      last_name: get(row, 'Last Name*', 'Last Name'),
+      first_name,
+      last_name,
       grade: get(row, 'Grade') || null,
       partner: get(row, 'Partner') || null,
       division: get(row, 'Division') || null,
@@ -475,6 +556,10 @@ function rowsToProjects(rows) {
       abstract: get(row, 'Abstract'),
       brief: get(row, 'Brief Abstract', 'Brief Abstracts'),
       keywords,
+      paper_link,
+      poster_link,
+      paper_href: buildAssetHref('paper', paper_link, projectBase),
+      poster_href: buildAssetHref('poster', poster_link, projectBase),
     });
   }
   return out;
@@ -559,6 +644,8 @@ function setStatusPill(mode, labelText, titleText = "") {
 async function fetchLive() {
   state.isLoading = true;
   state.loadError = null;
+  assetAvailability.clear();
+  pendingAssetChecks.clear();
   setStatusPill('fetching', 'fetching…');
   renderProjects();
   try {
@@ -624,9 +711,60 @@ function pcodeSortKey(pc) {
   return m ? [m[1].toUpperCase(), parseInt(m[2], 10)] : [pc, 0];
 }
 
+function assetKey(project, kind) {
+  return `${project.project_code}:${kind}`;
+}
+
+function renderAssetLink(project, kind) {
+  const href = kind === 'paper' ? project.paper_href : project.poster_href;
+  const label = kind === 'paper' ? 'Paper' : 'Poster';
+  if (!href) return `<span class="asset-link is-missing">${label} unavailable</span>`;
+  const availability = assetAvailability.get(assetKey(project, kind));
+  if (availability === 'missing') {
+    return `<span class="asset-link is-missing" title="This ${label.toLowerCase()} file is not available yet.">${label} unavailable</span>`;
+  }
+  return `<a class="asset-link" data-asset-link="${kind}" data-asset-key="${escapeHTML(assetKey(project, kind))}" href="${escapeHTML(href)}" target="_blank" rel="noopener">${label}</a>`;
+}
+
+async function verifyAssetHref(href) {
+  try {
+    const head = await fetch(href, { method: 'HEAD', cache: 'no-store' });
+    if (head.ok || head.type === 'opaque') return true;
+    if (head.status && head.status !== 405) return false;
+  } catch {}
+  try {
+    const get = await fetch(href, { method: 'GET', cache: 'no-store' });
+    return get.ok || get.type === 'opaque';
+  } catch {
+    return false;
+  }
+}
+
+function scheduleAssetVerification(projects) {
+  if (window.location.protocol === 'file:') return;
+  const checks = [];
+  projects.slice(0, 36).forEach(project => {
+    [['paper', project.paper_href], ['poster', project.poster_href]].forEach(([kind, href]) => {
+      if (!href || /^(https?:)?\/\//i.test(href)) return;
+      const key = assetKey(project, kind);
+      if (assetAvailability.has(key) || pendingAssetChecks.has(key)) return;
+      pendingAssetChecks.add(key);
+      checks.push(
+        verifyAssetHref(href).then(ok => {
+          pendingAssetChecks.delete(key);
+          assetAvailability.set(key, ok ? 'ok' : 'missing');
+        })
+      );
+    });
+  });
+  if (checks.length) {
+    Promise.all(checks).then(() => renderProjects());
+  }
+}
+
 function escapeHTML(s) {
   return String(s == null ? "" : s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/&/g, "&amp;").replace(/</g , "&lt;").replace( />/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 function highlight(text, query) {
@@ -706,8 +844,7 @@ function renderFacetGroup(listId, items, selectedSet, groupName) {
   const wrap = document.getElementById(listId);
   wrap.innerHTML = items.map(item => {
     const active = selectedSet.has(item.value);
-    return `<button class="facet-row ${active ? 'active' : ''}"
-      data-filter="${groupName}" data-value="${escapeHTML(item.value)}">
+    return `<button class="facet-row ${active ? 'active' : ''}" data-filter="${groupName}" data-value="${escapeHTML(item.value)}">
       <span class="facet-name">${item.code ? `<span class="facet-code">${escapeHTML(item.code)}</span>` : ''}${escapeHTML(item.label)}</span>
       <span class="facet-count">${item.count}</span>
     </button>`;
@@ -871,6 +1008,7 @@ function renderProjects() {
     const bookmarked = isBookmarked(p);
     const gradeHTML = p.grade ? `<span class="grade">· Grade ${escapeHTML(p.grade)}</span>` : "";
     const teacherHTML = p.teacher ? `<span class="teacher">· ${escapeHTML(p.teacher)}</span>` : "";
+    const assetHTML = `<p class="passets">${renderAssetLink(p, 'paper')}<span class="asset-sep">/</span>${renderAssetLink(p, 'poster')}</p>`;
     const keywordHTML = (p.keywords && p.keywords.length > 0)
       ? `<div class="ctags">${p.keywords.map(keyword => `<span class="ctag">${highlight(keyword, q)}</span>`).join("")}</div>`
       : "";
@@ -894,6 +1032,7 @@ function renderProjects() {
           </button>
         </div>
         <p class="pauthors">${highlight(authorsDisplay(p), q)} ${gradeHTML}${teacherHTML}</p>
+        ${assetHTML}
         ${briefHTML}
         ${expanded && p.abstract ? `<div class="pfull">${highlight(p.abstract, q)}</div>` : ""}
         ${p.abstract ? `<button class="more-btn" data-toggle="${escapeHTML(p.project_code)}">
@@ -903,6 +1042,7 @@ function renderProjects() {
       </div>
     </li>`;
   }).join("");
+  scheduleAssetVerification(sorted);
 }
 
 function render() {
@@ -978,6 +1118,31 @@ document.body.addEventListener("click", (e) => {
     renderProjects();
     return;
   }
+  const assetLink = e.target.closest("[data-asset-link]");
+  if (assetLink) {
+    const href = assetLink.getAttribute('href');
+    const key = assetLink.dataset.assetKey;
+    if (!href || !key) {
+      e.preventDefault();
+      return;
+    }
+    if (/^(https?:)?\/\//i.test(href) || window.location.protocol === 'file:') return;
+    e.preventDefault();
+    const known = assetAvailability.get(key);
+    if (known === 'missing') {
+      renderProjects();
+      return;
+    }
+    if (known === 'ok') {
+      window.open(href, '_blank', 'noopener');
+      return;
+    }
+    verifyAssetHref(href).then(ok => {
+      assetAvailability.set(key, ok ? 'ok' : 'missing');
+      renderProjects();
+      if (ok) window.open(href, '_blank', 'noopener');
+    });
+  }
 });
 
 $("#sort-btn").addEventListener("click", () => {
@@ -1011,6 +1176,6 @@ if (cachedProjects) {
 render();
 // Auto-fetch on load; browser cache is used as a fallback when available.
 fetchLive();
-</script>
-</body>
+        </script>
+    </body>
 </html>
