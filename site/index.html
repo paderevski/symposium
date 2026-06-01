@@ -276,6 +276,65 @@
     cursor: default;
   }
   .asset-sep { color: var(--border-strong); }
+  .pdf-modal {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; background: rgba(17, 24, 39, 0.52);
+    backdrop-filter: blur(3px);
+  }
+  .pdf-modal.open { display: flex; }
+  .pdf-dialog {
+    width: min(1040px, 100%); height: min(84vh, 920px);
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+    display: grid; grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+  .pdf-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--bg-soft);
+  }
+  .pdf-title {
+    margin: 0; min-width: 0;
+    font-family: var(--serif); font-size: 18px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pdf-actions {
+    display: flex; align-items: center; gap: 10px;
+    flex: 0 0 auto;
+  }
+  .pdf-link,
+  .pdf-close {
+    appearance: none; border: 1px solid var(--border-strong);
+    background: var(--bg); color: var(--muted-strong);
+    border-radius: 999px; padding: 8px 12px;
+    font: inherit; font-size: 12px; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    transition: color 120ms, border-color 120ms, background 120ms;
+  }
+  .pdf-link:hover,
+  .pdf-close:hover {
+    color: var(--accent); border-color: var(--accent-soft2); background: var(--accent-soft);
+  }
+  .pdf-close {
+    width: 34px; height: 34px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; line-height: 1;
+  }
+  .pdf-body {
+    position: relative; min-height: 0; background: #F3F4F6;
+  }
+  .pdf-frame {
+    width: 100%; height: 100%; border: 0; background: #F3F4F6;
+  }
+  .pdf-note {
+    position: absolute; left: 18px; bottom: 16px;
+    margin: 0; padding: 10px 12px;
+    border-radius: 10px; background: rgba(255,255,255,0.92);
+    border: 1px solid var(--border); color: var(--muted);
+    font-size: 12px; max-width: min(440px, calc(100% - 36px));
+  }
+  body.modal-open { overflow: hidden; }
   .pfull {
     border-left: 2px solid var(--accent-soft2); padding-left: 14px;
     margin: 12px 0 8px; color: #2A2A2A; white-space: pre-wrap;
@@ -314,6 +373,20 @@
     li.project { grid-template-columns: 48px 1fr; gap: 12px; }
     .search-bar, header.site, .layout, footer.site {
       padding-left: 18px; padding-right: 18px;
+    }
+    .pdf-modal { padding: 0; }
+    .pdf-dialog {
+      width: 100vw; height: 100vh; max-width: none;
+      border-radius: 0; border-left: none; border-right: none;
+    }
+    .pdf-head {
+      align-items: flex-start; flex-direction: column;
+    }
+    .pdf-actions {
+      width: 100%; justify-content: space-between;
+    }
+    .pdf-note {
+      left: 12px; right: 12px; bottom: 12px; max-width: none;
     }
   }
         </style>
@@ -411,6 +484,30 @@
                 <ul class="projects" id="projects">
                 </ul>
             </main>
+        </div>
+
+        <div class="pdf-modal" id="pdf-modal" aria-hidden="true">
+            <div class="pdf-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="pdf-title">
+                <div class="pdf-head">
+                    <p class="pdf-title" id="pdf-title">Document preview</p>
+                    <div class="pdf-actions">
+                        <a class="pdf-link"
+                           id="pdf-open-link"
+                           href="#"
+                           target="_blank"
+                           rel="noopener">Open in new tab</a>
+                        <a class="pdf-link" id="pdf-download-link" href="#" download>Download</a>
+                        <button class="pdf-close" id="pdf-close" aria-label="Close document preview">×</button>
+                    </div>
+                </div>
+                <div class="pdf-body">
+                    <iframe class="pdf-frame" id="pdf-frame" title="Document preview"></iframe>
+                    <p class="pdf-note">If the preview does not render in your browser, use “Open in new tab” or “Download”.</p>
+                </div>
+            </div>
         </div>
 
         <footer class="site">
@@ -517,6 +614,10 @@ function buildAssetHref(kind, value, project) {
     return `../${assetDir}/${pathParts}`;
   }
   return `/${assetDir}/${pathParts}`;
+}
+
+function shouldPreviewAsset(href) {
+  return !!href && /\.pdf(?:$|[?#])/i.test(href);
 }
 
 function rowsToProjects(rows) {
@@ -728,12 +829,13 @@ function assetKey(project, kind) {
 function renderAssetLink(project, kind) {
   const href = kind === 'paper' ? project.paper_href : project.poster_href;
   const label = kind === 'paper' ? 'Paper' : 'Poster';
+  const previewTitle = `${authorsDisplay(project)} — ${label}`;
   if (!href) return `<span class="asset-link is-missing">${label} unavailable</span>`;
   const availability = assetAvailability.get(assetKey(project, kind));
   if (availability === 'missing') {
     return `<span class="asset-link is-missing" title="This ${label.toLowerCase()} file is not available yet.">${label} unavailable</span>`;
   }
-  return `<a class="asset-link" data-asset-link="${kind}" data-asset-key="${escapeHTML(assetKey(project, kind))}" href="${escapeHTML(href)}" target="_blank" rel="noopener">${label}</a>`;
+  return `<a class="asset-link" data-asset-link="${kind}" data-asset-key="${escapeHTML(assetKey(project, kind))}" data-asset-title="${escapeHTML(previewTitle)}" href="${escapeHTML(href)}" target="_blank" rel="noopener">${label}</a>`;
 }
 
 async function verifyAssetHref(href) {
@@ -770,6 +872,39 @@ function scheduleAssetVerification(projects) {
   if (checks.length) {
     Promise.all(checks).then(() => renderProjects());
   }
+}
+
+const previewModal = document.getElementById('pdf-modal');
+const previewFrame = document.getElementById('pdf-frame');
+const previewTitle = document.getElementById('pdf-title');
+const previewOpenLink = document.getElementById('pdf-open-link');
+const previewDownloadLink = document.getElementById('pdf-download-link');
+const previewClose = document.getElementById('pdf-close');
+let previewLastFocus = null;
+
+function openAssetPreview(href, titleText) {
+  if (!previewModal || !previewFrame) {
+    window.open(href, '_blank', 'noopener');
+    return;
+  }
+  previewLastFocus = document.activeElement;
+  previewTitle.textContent = titleText || 'Document preview';
+  previewOpenLink.href = href;
+  previewDownloadLink.href = href;
+  previewFrame.src = href;
+  previewModal.classList.add('open');
+  previewModal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+  previewClose.focus();
+}
+
+function closeAssetPreview() {
+  if (!previewModal || !previewModal.classList.contains('open')) return;
+  previewModal.classList.remove('open');
+  previewModal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+  previewFrame.src = 'about:blank';
+  if (previewLastFocus && typeof previewLastFocus.focus === 'function') previewLastFocus.focus();
 }
 
 function escapeHTML(s) {
@@ -1132,27 +1267,47 @@ document.body.addEventListener("click", (e) => {
   if (assetLink) {
     const href = assetLink.getAttribute('href');
     const key = assetLink.dataset.assetKey;
+    const title = assetLink.dataset.assetTitle || assetLink.textContent.trim() || 'Document preview';
     if (!href || !key) {
       e.preventDefault();
       return;
     }
-    if (/^(https?:)?\/\//i.test(href) || window.location.protocol === 'file:') return;
     e.preventDefault();
+    if (/^(https?:)?\/\//i.test(href) && !href.startsWith(window.location.origin)) {
+      window.open(href, '_blank', 'noopener');
+      return;
+    }
+    if (!shouldPreviewAsset(href)) {
+      window.open(href, '_blank', 'noopener');
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      openAssetPreview(href, title);
+      return;
+    }
     const known = assetAvailability.get(key);
     if (known === 'missing') {
       renderProjects();
       return;
     }
     if (known === 'ok') {
-      window.open(href, '_blank', 'noopener');
+      openAssetPreview(href, title);
       return;
     }
     verifyAssetHref(href).then(ok => {
       assetAvailability.set(key, ok ? 'ok' : 'missing');
       renderProjects();
-      if (ok) window.open(href, '_blank', 'noopener');
+      if (ok) openAssetPreview(href, title);
     });
   }
+});
+
+previewClose.addEventListener('click', closeAssetPreview);
+previewModal.addEventListener('click', (e) => {
+  if (e.target === previewModal) closeAssetPreview();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeAssetPreview();
 });
 
 $("#sort-btn").addEventListener("click", () => {
