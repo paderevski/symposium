@@ -277,7 +277,7 @@
       <span class="dot"></span><span class="label">snapshot</span>
     </button>
   </div>
-  <p class="sub">Browse student research projects. Search the bar; filter by category, room, division, or computational approach.</p>
+  <p class="sub">Browse student research projects. Search the bar; filter by category, teacher, room, division, or keywords.</p>
   <hr class="accent-rule">
 </header>
 
@@ -300,12 +300,13 @@
       </div>
       <div class="facet-list" id="cat-list"></div>
     </div>
-    <div class="facet-group" id="room-group">
+
+    <div class="facet-group" id="keyword-group">
       <div class="facet-label">
-        <span>Room</span>
-        <button class="facet-clear hidden" data-group="room">clear</button>
+        <span>Keywords</span>
+        <button class="facet-clear hidden" data-group="keyword">clear</button>
       </div>
-      <div class="facet-list" id="room-list"></div>
+      <div class="facet-list" id="keyword-list"></div>
     </div>
     <div class="facet-group" id="div-group">
       <div class="facet-label">
@@ -314,12 +315,19 @@
       </div>
       <div class="facet-list" id="div-list"></div>
     </div>
-    <div class="facet-group" id="comp-group">
+    <div class="facet-group" id="teacher-group">
       <div class="facet-label">
-        <span>Computational</span>
-        <button class="facet-clear hidden" data-group="comp">clear</button>
+        <span>Teacher</span>
+        <button class="facet-clear hidden" data-group="teacher">clear</button>
       </div>
-      <div class="facet-list" id="comp-list"></div>
+      <div class="facet-list" id="teacher-list"></div>
+    </div>
+    <div class="facet-group" id="room-group">
+      <div class="facet-label">
+        <span>Room</span>
+        <button class="facet-clear hidden" data-group="room">clear</button>
+      </div>
+      <div class="facet-list" id="room-list"></div>
     </div>
   </aside>
 
@@ -346,9 +354,10 @@ let PROJECTS = [{"project_code":"A01","uuid":1236,"first_name":"Carly","last_nam
 const state = {
   search: "",
   cats: new Set(),
+  teachers: new Set(),
   rooms: new Set(),
   divs: new Set(),
-  comps: new Set(),
+  keywords: new Set(),
   expanded: new Set(),
   sortBy: "project_code",  // project_code | title | category | last_name | room
 };
@@ -400,9 +409,9 @@ function rowsToProjects(rows) {
     const m = catFull.match(/^(.*?)\s*\(([A-Z]+)\)\s*$/);
     const cat = m ? m[1].trim() : catFull;
     const code = m ? m[2].trim() : "";
-    const compRaw = get(row, 'Computational Aspects');
-    const comp = (!compRaw || compRaw.toLowerCase() === 'none')
-      ? [] : compRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const keywordRaw = get(row, 'Keywords', 'Computational Aspects');
+    const keywords = (!keywordRaw || keywordRaw.toLowerCase() === 'none')
+      ? [] : keywordRaw.split(',').map(s => s.trim()).filter(Boolean);
     const uuid_raw = get(row, 'UUID');
     out.push({
       project_code,
@@ -418,7 +427,7 @@ function rowsToProjects(rows) {
       title: get(row, 'Title'),
       abstract: get(row, 'Abstract'),
       brief: get(row, 'Brief Abstract', 'Brief Abstracts'),
-      computational: comp,
+      keywords,
     });
   }
   return out;
@@ -503,21 +512,22 @@ function highlight(text, query) {
 
 function matchesProject(p) {
   if (state.cats.size  && !state.cats.has(p.category))   return false;
+  if (state.teachers.size && !state.teachers.has(p.teacher)) return false;
   if (state.rooms.size && !state.rooms.has(p.room))      return false;
   if (state.divs.size  && !state.divs.has(p.division))   return false;
-  if (state.comps.size) {
-    if (state.comps.has("(none)")) {
-      if (state.comps.size === 1) {
-        if (p.computational.length > 0) return false;
+  if (state.keywords.size) {
+    if (state.keywords.has("(none)")) {
+      if (state.keywords.size === 1) {
+        if (p.keywords.length > 0) return false;
       } else {
-        // Mixed "none" + tags: match either no-computational or any of the selected tags
-        const others = [...state.comps].filter(c => c !== "(none)");
-        const okNone = p.computational.length === 0;
-        const okTag  = p.computational.some(c => others.includes(c));
+        // Mixed "none" + tags: match either no-keywords or any of the selected tags
+        const others = [...state.keywords].filter(keyword => keyword !== "(none)");
+        const okNone = p.keywords.length === 0;
+        const okTag  = p.keywords.some(keyword => others.includes(keyword));
         if (!okNone && !okTag) return false;
       }
     } else {
-      if (!p.computational.some(c => state.comps.has(c))) return false;
+      if (!p.keywords.some(keyword => state.keywords.has(keyword))) return false;
     }
   }
   if (state.search) {
@@ -525,7 +535,7 @@ function matchesProject(p) {
     const hay = (
       p.project_code + " " + p.title + " " + authorsSearch(p) + " " +
       p.brief + " " + p.abstract + " " + p.category + " " + p.category_code + " " +
-      (p.computational || []).join(" ") + " " + (p.teacher || "") + " " + (p.room || "")
+      (p.keywords || []).join(" ") + " " + (p.teacher || "") + " " + (p.room || "")
     ).toLowerCase();
     if (!hay.includes(q)) return false;
   }
@@ -574,14 +584,15 @@ function renderFacetGroup(listId, items, selectedSet, groupName) {
 
 function renderFacets() {
   // Build counts
-  const catCounts = {}, roomCounts = {}, divCounts = {}, compCounts = {};
+  const catCounts = {}, teacherCounts = {}, roomCounts = {}, divCounts = {}, keywordCounts = {};
   let noneCount = 0;
   PROJECTS.forEach(p => {
     catCounts[p.category] = (catCounts[p.category] || 0) + 1;
+    if (p.teacher) teacherCounts[p.teacher] = (teacherCounts[p.teacher] || 0) + 1;
     if (p.room) roomCounts[p.room] = (roomCounts[p.room] || 0) + 1;
     if (p.division) divCounts[p.division] = (divCounts[p.division] || 0) + 1;
-    if (p.computational.length === 0) noneCount++;
-    else p.computational.forEach(c => { compCounts[c] = (compCounts[c] || 0) + 1; });
+    if (p.keywords.length === 0) noneCount++;
+    else p.keywords.forEach(keyword => { keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1; });
   });
 
   // Categories — sorted alpha by name, code shown as prefix
@@ -607,12 +618,18 @@ function renderFacets() {
     value: d, label: d, code: "", count: divCounts[d]
   })), state.divs, 'div');
 
-  // Computational — top values + None
-  const compEntries = Object.entries(compCounts)
+  // Teachers
+  const teachers = Object.keys(teacherCounts).sort();
+  renderFacetGroup('teacher-list', teachers.map(t => ({
+    value: t, label: t, code: "", count: teacherCounts[t]
+  })), state.teachers, 'teacher');
+
+  // Keywords — top values + None
+  const keywordEntries = Object.entries(keywordCounts)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const compItems = compEntries.map(([k, v]) => ({ value: k, label: k, code: "", count: v }));
-  compItems.push({ value: "(none)", label: "None", code: "", count: noneCount });
-  renderFacetGroup('comp-list', compItems, state.comps, 'comp');
+  const keywordItems = keywordEntries.map(([keyword, count]) => ({ value: keyword, label: keyword, code: "", count }));
+  keywordItems.push({ value: "(none)", label: "None", code: "", count: noneCount });
+  renderFacetGroup('keyword-list', keywordItems, state.keywords, 'keyword');
 }
 
 function joinWithOr(values) {
@@ -622,9 +639,10 @@ function joinWithOr(values) {
 
 function getFilterSet(group) {
   return group === "cat" ? state.cats
+    : group === "teacher" ? state.teachers
     : group === "room" ? state.rooms
     : group === "div" ? state.divs
-    : state.comps;
+    : state.keywords;
 }
 
 function renderActiveFilters() {
@@ -632,6 +650,7 @@ function renderActiveFilters() {
   const pills = [];
 
   if (state.cats.size) pills.push({ group: 'cat', label: joinWithOr([...state.cats].sort()) });
+  if (state.teachers.size) pills.push({ group: 'teacher', label: joinWithOr([...state.teachers].sort()) });
   if (state.rooms.size) {
     const rooms = [...state.rooms]
       .sort((a, b) => {
@@ -643,11 +662,11 @@ function renderActiveFilters() {
     pills.push({ group: 'room', label: joinWithOr(rooms) });
   }
   if (state.divs.size) pills.push({ group: 'div', label: joinWithOr([...state.divs].sort()) });
-  if (state.comps.size) {
-    const comps = [...state.comps]
+  if (state.keywords.size) {
+    const keywords = [...state.keywords]
       .sort()
-      .map(value => value === '(none)' ? 'No computational aspect' : value);
-    pills.push({ group: 'comp', label: joinWithOr(comps) });
+      .map(value => value === '(none)' ? 'No keywords' : value);
+    pills.push({ group: 'keyword', label: joinWithOr(keywords) });
   }
 
   wrap.classList.toggle('hidden', pills.length === 0);
@@ -683,8 +702,8 @@ function renderProjects() {
   ul.innerHTML = sorted.map(p => {
     const expanded = state.expanded.has(p.project_code);
     const teacherHTML = p.teacher ? `<span class="teacher">· ${escapeHTML(p.teacher)}</span>` : "";
-    const compHTML = (p.computational && p.computational.length > 0)
-      ? `<div class="ctags">${p.computational.map(c => `<span class="ctag">${highlight(c, q)}</span>`).join("")}</div>`
+    const keywordHTML = (p.keywords && p.keywords.length > 0)
+      ? `<div class="ctags">${p.keywords.map(keyword => `<span class="ctag">${highlight(keyword, q)}</span>`).join("")}</div>`
       : "";
     const briefHTML = p.brief
       ? `<p class="pbrief">${highlight(p.brief, q)}</p>`
@@ -706,7 +725,7 @@ function renderProjects() {
         ${p.abstract ? `<button class="more-btn" data-toggle="${escapeHTML(p.project_code)}">
           ${expanded ? "Hide full abstract \u25B2" : "Read full abstract \u25BC"}
         </button>` : ""}
-        ${compHTML}
+        ${keywordHTML}
       </div>
     </li>`;
   }).join("");
@@ -730,9 +749,10 @@ $("#search").addEventListener("input", (e) => {
 $("#clear-all").addEventListener("click", () => {
   state.search = "";
   state.cats.clear();
+  state.teachers.clear();
   state.rooms.clear();
   state.divs.clear();
-  state.comps.clear();
+  state.keywords.clear();
   state.expanded.clear();
   $("#search").value = "";
   render();
