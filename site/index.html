@@ -78,6 +78,14 @@
     padding: 14px 28px; max-width: var(--maxw); margin: 0 auto;
     display: flex; gap: 10px; align-items: center;
   }
+  .mobile-filters-btn {
+    display: none;
+    padding: 9px 14px; border: 1px solid var(--border-strong);
+    background: var(--bg); color: var(--muted);
+    border-radius: 6px; cursor: pointer; font-family: var(--sans); font-size: 13px;
+    white-space: nowrap;
+  }
+  .mobile-filters-btn:hover { color: var(--accent); border-color: var(--accent); }
   .search-input {
     flex: 1; font-family: var(--sans); font-size: 15px;
     padding: 10px 14px; border: 1px solid var(--border-strong);
@@ -138,6 +146,23 @@
   }
   aside.filters::-webkit-scrollbar { width: 6px; }
   aside.filters::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  .filters-head { display: none; }
+  .filters-backdrop {
+    position: fixed; inset: 0; z-index: 39;
+    display: none; background: rgba(17, 24, 39, 0.32);
+    backdrop-filter: blur(2px);
+  }
+  .filters-backdrop.open { display: block; }
+  .filters-close {
+    appearance: none; border: 1px solid var(--border-strong);
+    background: var(--bg); color: var(--muted-strong);
+    border-radius: 999px; width: 34px; height: 34px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: inherit; font-size: 18px; line-height: 1; cursor: pointer;
+  }
+  .filters-close:hover {
+    color: var(--accent); border-color: var(--accent-soft2); background: var(--accent-soft);
+  }
 
   .facet-group { margin: 0 0 24px; }
   .facet-label {
@@ -362,9 +387,24 @@
   /* ---------- responsive ---------- */
   @media (max-width: 820px) {
     .layout { grid-template-columns: 1fr; }
+    .mobile-filters-btn { display: inline-flex; align-items: center; justify-content: center; }
     aside.filters {
-      position: static; max-height: none; padding: 16px 0;
-      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
+      width: min(340px, calc(100vw - 28px)); max-height: none;
+      margin: 0; padding: 16px 18px 24px;
+      border-right: 1px solid var(--border); background: var(--bg);
+      transform: translateX(calc(-100% - 12px)); transition: transform 180ms ease;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+    }
+    aside.filters.open { transform: translateX(0); }
+    .filters-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin: 0 0 18px; padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .filters-title {
+      margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+      color: var(--muted); text-transform: uppercase;
     }
     .facet-group { margin-bottom: 16px; }
   }
@@ -373,6 +413,15 @@
     li.project { grid-template-columns: 48px 1fr; gap: 12px; }
     .search-bar, header.site, .layout, footer.site {
       padding-left: 18px; padding-right: 18px;
+    }
+    .search-bar {
+      flex-wrap: wrap;
+    }
+    .search-input {
+      min-width: 0; width: 100%; order: 1;
+    }
+    .mobile-filters-btn, .clear-btn {
+      order: 2;
     }
     .pdf-modal { padding: 0; }
     .pdf-dialog {
@@ -421,13 +470,23 @@
                        autocorrect="off"
                        autocapitalize="off"
                        spellcheck="false">
+                <button class="mobile-filters-btn"
+                        id="mobile-filters-toggle"
+                        aria-expanded="false"
+                        aria-controls="filters-panel">Filters</button>
                 <button class="clear-btn" id="clear-all">Reset</button>
             </div>
             <div class="active-filters hidden" id="active-filters" aria-live="polite"></div>
         </section>
 
+        <div class="filters-backdrop" id="filters-backdrop" hidden></div>
+
         <div class="layout">
-            <aside class="filters">
+            <aside class="filters" id="filters-panel">
+                <div class="filters-head">
+                    <p class="filters-title">Filters</p>
+                    <button class="filters-close" id="filters-close" aria-label="Close filters">×</button>
+                </div>
                 <div class="facet-group" id="saved-group">
                     <div class="facet-label">
                         <span>Saved</span>
@@ -543,6 +602,7 @@ const state = {
   bookmarkedCodes: new Set(),
   isLoading: true,
   loadError: null,
+  mobileFiltersOpen: false,
   sortBy: "project_code",  // project_code | title | category | last_name | room
 };
 
@@ -982,6 +1042,48 @@ function sortProjects(list) {
   return [...list].sort(sorters[state.sortBy] || sorters.project_code);
 }
 
+function isMobileFiltersMode() {
+  return window.matchMedia('(max-width: 820px)').matches;
+}
+
+function activeFacetCount() {
+  return state.saved.size + state.cats.size + state.teachers.size + state.rooms.size + state.divs.size + state.keywords.size;
+}
+
+function syncOverlayLock() {
+  const hasModal = previewModal && previewModal.classList.contains('open');
+  document.body.classList.toggle('modal-open', hasModal || state.mobileFiltersOpen);
+}
+
+function syncMobileFiltersUI() {
+  const panel = document.getElementById('filters-panel');
+  const backdrop = document.getElementById('filters-backdrop');
+  const toggle = document.getElementById('mobile-filters-toggle');
+  const count = activeFacetCount();
+  if (toggle) {
+    toggle.textContent = count > 0 ? `Filters (${count})` : 'Filters';
+    toggle.setAttribute('aria-expanded', state.mobileFiltersOpen ? 'true' : 'false');
+  }
+  if (!panel || !backdrop) return;
+  const shouldOpen = state.mobileFiltersOpen && isMobileFiltersMode();
+  panel.classList.toggle('open', shouldOpen);
+  backdrop.classList.toggle('open', shouldOpen);
+  backdrop.hidden = !shouldOpen;
+  syncOverlayLock();
+}
+
+function closeMobileFilters() {
+  if (!state.mobileFiltersOpen) return;
+  state.mobileFiltersOpen = false;
+  syncMobileFiltersUI();
+}
+
+function openMobileFilters() {
+  if (!isMobileFiltersMode()) return;
+  state.mobileFiltersOpen = true;
+  syncMobileFiltersUI();
+}
+
 // ============================================================
 // Render: facet sidebar
 // ============================================================
@@ -1193,6 +1295,7 @@ function renderProjects() {
 function render() {
   renderFacets();
   renderActiveFilters();
+  syncMobileFiltersUI();
   updateStickyOffsets();
   renderProjects();
 }
@@ -1217,6 +1320,14 @@ $("#clear-all").addEventListener("click", () => {
   $("#search").value = "";
   render();
 });
+
+$("#mobile-filters-toggle").addEventListener("click", () => {
+  if (state.mobileFiltersOpen) closeMobileFilters();
+  else openMobileFilters();
+});
+
+$("#filters-close").addEventListener("click", closeMobileFilters);
+$("#filters-backdrop").addEventListener("click", closeMobileFilters);
 
 $("#data-status").addEventListener("click", fetchLive);
 
@@ -1307,7 +1418,10 @@ previewModal.addEventListener('click', (e) => {
   if (e.target === previewModal) closeAssetPreview();
 });
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeAssetPreview();
+  if (e.key === 'Escape') {
+    closeAssetPreview();
+    closeMobileFilters();
+  }
 });
 
 $("#sort-btn").addEventListener("click", () => {
@@ -1322,7 +1436,11 @@ $("#sort-btn").addEventListener("click", () => {
   renderProjects();
 });
 
-window.addEventListener('resize', updateStickyOffsets);
+window.addEventListener('resize', () => {
+  if (!isMobileFiltersMode()) closeMobileFilters();
+  else syncMobileFiltersUI();
+  updateStickyOffsets();
+});
 
 // ============================================================
 // Boot
