@@ -249,6 +249,15 @@
     font-family: var(--serif); font-size: 19px; font-weight: 700;
     line-height: 1.28; margin: 0 0 6px; color: var(--text);
   }
+  .award-mark {
+    display: inline-block; margin-right: 8px;
+    font-size: 16px; line-height: 1; vertical-align: 0.04em;
+  }
+  .award-mark.white {
+    filter: brightness(1.45) contrast(0.9);
+  }
+  .award-mark.red { filter: saturate(1.15); }
+  .award-mark.blue { filter: saturate(1.05); }
   .bookmark-btn {
     flex: 0 0 auto;
     display: inline-flex; align-items: center; justify-content: center;
@@ -280,6 +289,32 @@
   .pauthors .grade {
     color: var(--muted-strong); font-weight: 600;
     letter-spacing: 0.04em; text-transform: none; margin-left: 8px;
+  }
+  .paward {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 0 0 10px;
+  }
+  .award-chip {
+    display: inline-flex; align-items: center;
+    min-height: 24px; padding: 3px 9px;
+    border-radius: 999px; border: 1px solid #E7D28A;
+    background: #FFF7DB; color: #8A5A00;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .award-chip.white {
+    border-color: #D1D5DB;
+    background: #def3de;
+    color: #6B7280;
+  }
+  .award-chip.red {
+    border-color: #E8B0B0;
+    background: #FFF1F1;
+    color: #A12828;
+  }
+  .award-chip.blue {
+    border-color: #B7CAE8;
+    background: #F1F6FF;
+    color: #295A9E;
   }
   .pbrief { color: var(--text); margin: 0 0 8px; }
   .passets {
@@ -495,6 +530,14 @@
                     <div class="facet-list" id="saved-list"></div>
                 </div>
 
+                <div class="facet-group" id="award-group">
+                    <div class="facet-label">
+                        <span>Awards</span>
+                        <button class="facet-clear hidden" data-group="award">clear</button>
+                    </div>
+                    <div class="facet-list" id="award-list"></div>
+                </div>
+
                 <div class="facet-group" id="cat-group">
                     <div class="facet-label">
                         <span>Category</span>
@@ -580,7 +623,60 @@
 "use strict";
 
 const LIVE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv";
-const CACHE_KEY = "symposium-projects-cache-v2";
+const AWARD_SOURCES = [
+      {
+    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=462676461&single=true&output=csv",
+    buildAwards: (get) => {
+      const award = get('Award');
+      if (!award) return [];
+      return [{
+        label: "ISEF: " + award,
+        family: 'ISEF',
+        tone: 'blue',
+        icon: '🏆',
+      }];
+    },
+  },
+  {
+    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=130411292&single=true&output=csv",
+    buildAwards: () => [{
+      label: 'Symposium Category Award',
+      family: 'Symposium',
+      tone: 'white',
+      icon: '🎗',
+    }],
+  },
+  {
+    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1866244&single=true&output=csv",
+    buildAwards: (get) => {
+      const categoryAward = get('Category Award');
+      if (!categoryAward) return [];
+      return [{
+        label: `RSEF Category ${categoryAward}`,
+        family: 'RSEF',
+        tone: 'red',
+        icon: '🎀',
+      }];
+    },
+  },
+  {
+    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=584853279&single=true&output=csv",
+    buildAwards: (get) => {
+      const award = get('Award');
+      const info = get('Info');
+      if (!award) return [];
+      return [{
+        label: info ? `${award} - ${info}` : award,
+        family: 'RSEF',
+        tone: 'gold',
+        icon: '🏅',
+      }];
+    },
+  },
+
+];
+const AWARD_FACET_FAMILIES = ['Symposium', 'RSEF', 'ISEF'];
+const CACHE_KEY = "symposium-projects-cache-v5";
 const BOOKMARKS_KEY = "symposium-project-bookmarks-v1";
 const ASSET_DIRS = {
   paper: "Papers",
@@ -593,6 +689,7 @@ let PROJECTS = [];
 const state = {
   search: "",
   saved: new Set(),
+  awardFamilies: new Set(),
   cats: new Set(),
   teachers: new Set(),
   rooms: new Set(),
@@ -680,6 +777,86 @@ function shouldPreviewAsset(href) {
   return !!href && /\.pdf(?:$|[?#])/i.test(href);
 }
 
+function normalizeUuidKey(value) {
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return "";
+  return /^\d+(\.0+)?$/.test(raw) ? String(parseInt(raw, 10)) : raw;
+}
+
+function awardFamiliesForProject(project) {
+  return Array.from(new Set((project.awards || []).map(award => award.family).filter(Boolean)));
+}
+
+function collectAwardsByUuid(rows, buildAwards) {
+  if (rows.length < 2) return new Map();
+  const headers = rows[0].map(h => h.trim());
+  const uuidIndex = headers.findIndex(h => h.toLowerCase() === 'uuid');
+  if (uuidIndex === -1) return new Map();
+  const indexes = {};
+  headers.forEach((header, index) => {
+    indexes[header.toLowerCase()] = index;
+  });
+  const get = (row, ...names) => {
+    for (const name of names) {
+      const index = indexes[name.toLowerCase()];
+      if (index !== undefined) return String(row[index] || '').trim();
+    }
+    return '';
+  };
+  const awards = new Map();
+  for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+    const row = rows[rowIndex];
+    if (!row || row.every(cell => !cell || !cell.trim())) continue;
+    const uuid = normalizeUuidKey(row[uuidIndex]);
+    if (!uuid) continue;
+    const items = buildAwards((...names) => get(row, ...names), row, headers) || [];
+    if (items.length === 0) continue;
+    const list = awards.get(uuid) || [];
+    items.forEach(item => {
+      if (!item || !item.label) return;
+      if (!list.some(existing => existing.label === item.label)) list.push(item);
+    });
+    if (list.length === 0) continue;
+    awards.set(uuid, list);
+  }
+  return awards;
+}
+
+function combineAwardMaps(...maps) {
+  const combined = new Map();
+  maps.forEach(map => {
+    map.forEach((items, uuid) => {
+      const list = combined.get(uuid) || [];
+      items.forEach(item => {
+        if (!list.some(existing => existing.label === item.label)) list.push(item);
+      });
+      combined.set(uuid, list);
+    });
+  });
+  return combined;
+}
+
+async function fetchAwardMap() {
+  const maps = await Promise.all(AWARD_SOURCES.map(async (source) => {
+    try {
+      const resp = await fetch(source.url, { cache: "no-store" });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const text = await resp.text();
+      return collectAwardsByUuid(parseCSV(text), source.buildAwards);
+    } catch {
+      return new Map();
+    }
+  }));
+  return combineAwardMaps(...maps);
+}
+
+function mergeAwards(projects, awardMap) {
+  return projects.map(project => ({
+    ...project,
+    awards: awardMap.get(normalizeUuidKey(project.uuid)) || [],
+  }));
+}
+
 function rowsToProjects(rows) {
   if (rows.length < 2) return [];
   const headers = rows[0].map(h => h.trim());
@@ -727,6 +904,7 @@ function rowsToProjects(rows) {
       abstract: get(row, 'Abstract'),
       brief: get(row, 'Brief Abstract', 'Brief Abstracts'),
       keywords,
+      awards: [],
       paper_link,
       poster_link,
       paper_href: buildAssetHref('paper', paper_link, projectBase),
@@ -820,13 +998,17 @@ async function fetchLive() {
   setStatusPill('fetching', 'fetching…');
   renderProjects();
   try {
-    const resp = await fetch(LIVE_URL, { cache: "no-store" });
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const text = await resp.text();
+    const [projectResp, awardMap] = await Promise.all([
+      fetch(LIVE_URL, { cache: "no-store" }),
+      fetchAwardMap(),
+    ]);
+    if (!projectResp.ok) throw new Error("HTTP " + projectResp.status);
+    const text = await projectResp.text();
     const fresh = rowsToProjects(parseCSV(text));
     if (fresh.length === 0) throw new Error("No rows parsed");
-    PROJECTS = fresh;
-    saveCachedProjects(fresh);
+    const withAwards = awardMap.size > 0 ? mergeAwards(fresh, awardMap) : fresh;
+    PROJECTS = withAwards;
+    saveCachedProjects(withAwards);
     state.isLoading = false;
     setStatusPill('live', `live · ${formatStatusTime(Date.now())}`, 'Showing fresh live data from Google Sheets.');
     render();
@@ -982,6 +1164,7 @@ function highlight(text, query) {
 
 function matchesProject(p, ignoreGroup = null) {
   const saved = ignoreGroup === 'saved' ? null : state.saved;
+  const awardFamilies = ignoreGroup === 'award' ? null : state.awardFamilies;
   const cats = ignoreGroup === 'cat' ? null : state.cats;
   const teachers = ignoreGroup === 'teacher' ? null : state.teachers;
   const rooms = ignoreGroup === 'room' ? null : state.rooms;
@@ -989,6 +1172,10 @@ function matchesProject(p, ignoreGroup = null) {
   const keywords = ignoreGroup === 'keyword' ? null : state.keywords;
 
   if (saved && saved.size && !isBookmarked(p)) return false;
+  if (awardFamilies && awardFamilies.size) {
+    const families = awardFamiliesForProject(p);
+    if (!families.some(family => awardFamilies.has(family))) return false;
+  }
   if (cats && cats.size && !cats.has(p.category)) return false;
   if (teachers && teachers.size && !teachers.has(p.teacher)) return false;
   if (rooms && rooms.size && !rooms.has(p.room)) return false;
@@ -1013,7 +1200,8 @@ function matchesProject(p, ignoreGroup = null) {
     const hay = (
       p.project_code + " " + p.title + " " + authorsSearch(p) + " " +
       p.brief + " " + p.abstract + " " + p.category + " " + p.category_code + " " +
-      (p.keywords || []).join(" ") + " " + (p.teacher || "") + " " + (p.grade || "") + " " + (p.room || "")
+      (p.keywords || []).join(" ") + " " + (p.teacher || "") + " " + (p.grade || "") + " " + (p.room || "") + " " +
+      (p.awards || []).map(award => `${award.family || ''} ${award.label || ''}`).join(" ")
     ).toLowerCase();
     if (!hay.includes(q)) return false;
   }
@@ -1047,7 +1235,7 @@ function isMobileFiltersMode() {
 }
 
 function activeFacetCount() {
-  return state.saved.size + state.cats.size + state.teachers.size + state.rooms.size + state.divs.size + state.keywords.size;
+  return state.saved.size + state.awardFamilies.size + state.cats.size + state.teachers.size + state.rooms.size + state.divs.size + state.keywords.size;
 }
 
 function syncOverlayLock() {
@@ -1103,11 +1291,12 @@ function renderFacetGroup(listId, items, selectedSet, groupName) {
 
 function renderFacets() {
   const buildCounts = (projects) => {
-    const catCounts = {}, teacherCounts = {}, roomCounts = {}, divCounts = {}, keywordCounts = {};
+    const awardCounts = {}, catCounts = {}, teacherCounts = {}, roomCounts = {}, divCounts = {}, keywordCounts = {};
     let noneCount = 0;
     let savedCount = 0;
     projects.forEach(p => {
       if (isBookmarked(p)) savedCount++;
+      awardFamiliesForProject(p).forEach(family => { awardCounts[family] = (awardCounts[family] || 0) + 1; });
       catCounts[p.category] = (catCounts[p.category] || 0) + 1;
       if (p.teacher) teacherCounts[p.teacher] = (teacherCounts[p.teacher] || 0) + 1;
       if (p.room) roomCounts[p.room] = (roomCounts[p.room] || 0) + 1;
@@ -1115,10 +1304,11 @@ function renderFacets() {
       if (p.keywords.length === 0) noneCount++;
       else p.keywords.forEach(keyword => { keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1; });
     });
-    return { catCounts, teacherCounts, roomCounts, divCounts, keywordCounts, noneCount, savedCount };
+    return { awardCounts, catCounts, teacherCounts, roomCounts, divCounts, keywordCounts, noneCount, savedCount };
   };
 
   const savedFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'saved')));
+  const awardFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'award')));
   const catFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'cat')));
   const roomFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'room')));
   const divFacetCounts = buildCounts(PROJECTS.filter(p => matchesProject(p, 'div')));
@@ -1130,6 +1320,13 @@ function renderFacets() {
   renderFacetGroup('saved-list', [{
     value: 'saved', label: 'Bookmarked', code: '', count: savedFacetCounts.savedCount || 0
   }], state.saved, 'saved');
+
+  renderFacetGroup('award-list', AWARD_FACET_FAMILIES.map(family => ({
+    value: family,
+    label: family,
+    code: "",
+    count: awardFacetCounts.awardCounts[family] || 0
+  })), state.awardFamilies, 'award');
 
   // Categories — sorted alpha by name, code shown as prefix
   const cats = Object.keys(allCounts.catCounts).sort();
@@ -1180,6 +1377,7 @@ function joinWithOr(values) {
 
 function getFilterSet(group) {
   return group === "saved" ? state.saved
+    : group === "award" ? state.awardFamilies
     : group === "cat" ? state.cats
     : group === "teacher" ? state.teachers
     : group === "room" ? state.rooms
@@ -1192,6 +1390,7 @@ function renderActiveFilters() {
   const pills = [];
 
   if (state.saved.size) pills.push({ group: 'saved', label: 'Bookmarked' });
+  if (state.awardFamilies.size) pills.push({ group: 'award', label: joinWithOr([...state.awardFamilies].sort()) });
   if (state.cats.size) pills.push({ group: 'cat', label: joinWithOr([...state.cats].sort()) });
   if (state.teachers.size) pills.push({ group: 'teacher', label: joinWithOr([...state.teachers].sort()) });
   if (state.rooms.size) {
@@ -1253,8 +1452,15 @@ function renderProjects() {
   ul.innerHTML = sorted.map(p => {
     const expanded = state.expanded.has(p.project_code);
     const bookmarked = isBookmarked(p);
+    const hasAwards = Array.isArray(p.awards) && p.awards.length > 0;
     const gradeHTML = p.grade ? `<span class="grade">· Grade ${escapeHTML(p.grade)}</span>` : "";
     const teacherHTML = p.teacher ? `<span class="teacher">· ${escapeHTML(p.teacher)}</span>` : "";
+    const awardTitleHTML = hasAwards
+      ? p.awards.map(award => `<span class="award-mark ${escapeHTML(award.tone || 'gold')}" aria-hidden="true">${escapeHTML(award.icon || '🎗')}</span>`).join('')
+      : "";
+    const awardsHTML = hasAwards
+      ? `<p class="paward">${p.awards.map(award => `<span class="award-chip ${escapeHTML(award.tone || 'gold')}">${escapeHTML(award.label)}</span>`).join("")}</p>`
+      : "";
     const assetHTML = `<p class="passets">${renderAssetLink(p, 'paper')}<span class="asset-sep">/</span>${renderAssetLink(p, 'poster')}</p>`;
     const keywordHTML = (p.keywords && p.keywords.length > 0)
       ? `<div class="ctags">${p.keywords.map(keyword => `<span class="ctag">${highlight(keyword, q)}</span>`).join("")}</div>`
@@ -1273,12 +1479,13 @@ function renderProjects() {
           ${p.division ? `<span class="sep">·</span><span class="div">${escapeHTML(p.division)}</span>` : ""}
         </p>
         <div class="project-head">
-          <p class="ptitle">${highlight(p.title, q)}</p>
+          <p class="ptitle">${awardTitleHTML}${highlight(p.title, q)}</p>
           <button class="bookmark-btn ${bookmarked ? 'active' : ''}" data-bookmark="${escapeHTML(p.project_code)}" aria-pressed="${bookmarked ? 'true' : 'false'}" aria-label="${bookmarked ? 'Remove bookmark' : 'Save project'}">
             <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 2.5h8a1 1 0 0 1 1 1V14l-5-3.2L3 14V3.5a1 1 0 0 1 1-1Z"></path></svg>
           </button>
         </div>
         <p class="pauthors">${highlight(authorsDisplay(p), q)} ${gradeHTML}${teacherHTML}</p>
+        ${awardsHTML}
         ${assetHTML}
         ${briefHTML}
         ${expanded && p.abstract ? `<div class="pfull">${highlight(p.abstract, q)}</div>` : ""}
