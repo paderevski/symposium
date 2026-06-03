@@ -745,7 +745,8 @@ function normalizeAssetReference(value, kind, project) {
   const raw = String(value || "").trim();
   if (raw) {
     if (/^(https?:)?\/\//i.test(raw)) return raw;
-    const filename = raw.split(/[?#]/, 1)[0].split("/").pop().trim();
+    const parts = raw.split(/[?#]/, 1)[0].split("/").map(part => part.trim()).filter(Boolean);
+    const filename = parts.pop();
     if (!filename) return "";
     const dot = filename.lastIndexOf(".");
     const stem = dot >= 0 ? filename.slice(0, dot) : filename;
@@ -753,7 +754,8 @@ function normalizeAssetReference(value, kind, project) {
     let normalized = `${slugAssetPart(stem)}${ext}`;
     if (kind === "poster") normalized = normalized.replace(/\.png$/i, ".pdf");
     if (!/\.[A-Za-z0-9]+$/.test(normalized)) normalized += ".pdf";
-    return normalized;
+    const folderParts = parts.map(part => part.replace(/^[./]+|[./]+$/g, "")).filter(Boolean);
+    return folderParts.length ? `${folderParts.join("/")}/${normalized}` : normalized;
   }
   const first = slugAssetPart(project.first_name);
   const last = slugAssetPart(project.last_name);
@@ -867,10 +869,14 @@ function rowsToProjects(rows) {
   const headers = rows[0].map(h => h.trim());
   const idx = {};
   headers.forEach((h, i) => { idx[h] = i; });
+  const cleanSheetValue = (value) => {
+    const trimmed = String(value || "").trim();
+    return /^#?N\/A$/i.test(trimmed) ? "" : trimmed;
+  };
   const get = (row, ...names) => {
     for (const name of names) {
       const k = Object.keys(idx).find(h => h.toLowerCase() === name.toLowerCase());
-      if (k && row[idx[k]] !== undefined) return (row[idx[k]] || "").trim();
+      if (k && row[idx[k]] !== undefined) return cleanSheetValue(row[idx[k]]);
     }
     return "";
   };
@@ -890,6 +896,8 @@ function rowsToProjects(rows) {
     const uuid_raw = get(row, 'UUID');
     const first_name = get(row, 'First Name*', 'First Name');
     const last_name = get(row, 'Last Name*', 'Last Name');
+    const teacher = get(row, 'Teacher') || null;
+    if (!first_name && !last_name && !teacher) continue;
     const paper_link = get(row, 'Paper Link');
     const poster_link = get(row, 'Poster Link');
     const projectBase = { first_name, last_name };
@@ -901,7 +909,7 @@ function rowsToProjects(rows) {
       grade: get(row, 'Grade') || null,
       partner: get(row, 'Partner') || null,
       division: get(row, 'Division') || null,
-      teacher: get(row, 'Teacher') || null,
+      teacher,
       room: get(row, 'Room') || null,
       category: cat,
       category_code: code,
