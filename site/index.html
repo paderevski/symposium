@@ -3,6 +3,10 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description"
+              content="Browse student projects from the ACL Research Symposium 2026, including abstracts, awards, categories, and paper and poster links.">
+        <meta name="keywords"
+              content="ACL Research Symposium, student research, science fair, projects, abstracts, awards, posters, papers">
         <title>ACL Research Symposium 2026 — Projects</title>
         <style>
   :root {
@@ -685,6 +689,7 @@ const ASSET_DIRS = {
 const assetAvailability = new Map();
 const pendingAssetChecks = new Set();
 let PROJECTS = [];
+let randomSortRanks = new Map();
 
 const state = {
   search: "",
@@ -700,7 +705,7 @@ const state = {
   isLoading: true,
   loadError: null,
   mobileFiltersOpen: false,
-  sortBy: "project_code",  // project_code | title | category | last_name | room
+  sortBy: "random",  // random | project_code | title | category | last_name | room
 };
 
 // ============================================================
@@ -1008,6 +1013,7 @@ async function fetchLive() {
     if (fresh.length === 0) throw new Error("No rows parsed");
     const withAwards = awardMap.size > 0 ? mergeAwards(fresh, awardMap) : fresh;
     PROJECTS = withAwards;
+    rebuildRandomSortRanks(withAwards);
     saveCachedProjects(withAwards);
     state.isLoading = false;
     setStatusPill('live', `live · ${formatStatusTime(Date.now())}`, 'Showing fresh live data from Google Sheets.');
@@ -1062,6 +1068,33 @@ function roomSortKey(r) {
 function pcodeSortKey(pc) {
   const m = (pc || "").match(/^([A-Z]+)(\d+)$/i);
   return m ? [m[1].toUpperCase(), parseInt(m[2], 10)] : [pc, 0];
+}
+
+function rebuildRandomSortRanks(projects) {
+  const codes = projects.map(project => project.project_code).filter(Boolean);
+  for (let index = codes.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const temp = codes[index];
+    codes[index] = codes[swapIndex];
+    codes[swapIndex] = temp;
+  }
+  randomSortRanks = new Map(codes.map((code, index) => [code, index]));
+}
+
+function getSortLabel(sortBy) {
+  return {
+    random: "Random",
+    project_code: "Project #",
+    title: "Title",
+    category: "Category",
+    room: "Room",
+    last_name: "Last Name",
+  }[sortBy] || "Project #";
+}
+
+function syncSortButtonLabel() {
+  const sortBtn = $("#sort-btn");
+  if (sortBtn) sortBtn.textContent = "Sort: " + getSortLabel(state.sortBy);
 }
 
 function assetKey(project, kind) {
@@ -1210,6 +1243,12 @@ function matchesProject(p, ignoreGroup = null) {
 
 function sortProjects(list) {
   const sorters = {
+    random: (a, b) => {
+      const rankA = randomSortRanks.get(a.project_code);
+      const rankB = randomSortRanks.get(b.project_code);
+      if (rankA != null && rankB != null && rankA !== rankB) return rankA - rankB;
+      return sorters.project_code(a, b);
+    },
     project_code: (a, b) => {
       const ka = pcodeSortKey(a.project_code), kb = pcodeSortKey(b.project_code);
       if (ka[0] !== kb[0]) return ka[0] < kb[0] ? -1 : 1;
@@ -1632,14 +1671,10 @@ window.addEventListener('keydown', (e) => {
 });
 
 $("#sort-btn").addEventListener("click", () => {
-  const order = ["project_code", "title", "category", "room", "last_name"];
-  const labels = {
-    project_code: "Project #", title: "Title",
-    category: "Category", room: "Room", last_name: "Last Name"
-  };
+  const order = ["random", "project_code", "title", "category", "room", "last_name"];
   const next = order[(order.indexOf(state.sortBy) + 1) % order.length];
   state.sortBy = next;
-  $("#sort-btn").textContent = "Sort: " + labels[next];
+  syncSortButtonLabel();
   renderProjects();
 });
 
@@ -1656,6 +1691,7 @@ state.bookmarkedCodes = loadBookmarkedCodes();
 const cachedProjects = loadCachedProjects();
 if (cachedProjects) {
   PROJECTS = cachedProjects.projects;
+  rebuildRandomSortRanks(cachedProjects.projects);
   state.isLoading = false;
   setStatusPill(
     'cached',
@@ -1663,6 +1699,7 @@ if (cachedProjects) {
     'Showing browser-cached data from ' + formatStatusTime(cachedProjects.savedAt || Date.now()) + ' while refreshing in the background.'
   );
 }
+syncSortButtonLabel();
 render();
 // Auto-fetch on load; browser cache is used as a fallback when available.
 fetchLive();
