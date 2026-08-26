@@ -88,7 +88,7 @@ fi
 read -r canvas_width canvas_height <<EOF
 $(awk -v mp="$MEGAPIXELS" -v cols="$COLUMNS" -v rows="$ROWS" 'BEGIN {
   total_pixels = mp * 1000000;
-  aspect = cols / rows;
+  aspect = 4/3.0;
   width = int(sqrt(total_pixels * aspect) + 0.5);
   height = int(total_pixels / width + 0.5);
   print width, height;
