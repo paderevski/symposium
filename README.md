@@ -24,7 +24,9 @@ The website combines two kinds of data:
 
 ### 1. Live project metadata
 
-The primary project list is fetched at runtime by the browser from the published Google Sheet referenced by `LIVE_URL` in `site/index.html`.
+All project and award data originates in a Google Sheets document. Individual sheets within that document are published separately as CSV feeds for the website. In `site/index.html`, each year's entry in `YEAR_CONFIGS` identifies the published primary-project CSV as `liveUrl` and its published award-sheet CSVs as `awardSources`.
+
+The browser fetches the selected year's primary project CSV at runtime. For 2026, that is the project sheet from the original Google Sheets document. The 2027 configuration uses its own published primary-project CSV.
 
 That sheet provides the fields used to render each project card, including:
 
@@ -42,7 +44,7 @@ That sheet provides the fields used to render each project card, including:
 - keywords
 - paper link and poster link
 
-Award information is not embedded in the main sheet. It is merged in the browser from four additional published CSV feeds listed in `AWARD_SOURCES` in `site/index.html`:
+Award information is not embedded in the main project sheet. For 2026, it is merged in the browser from four additional published CSV feeds from sheets in the same Google Sheets document:
 
 - ISEF awards
 - Symposium category awards
@@ -51,19 +53,21 @@ Award information is not embedded in the main sheet. It is merged in the browser
 
 The merge key is the project `UUID`.
 
+The 2027 configuration currently has no award sources. Its projects load normally without awards until its published award-sheet CSV URLs are added to `YEAR_CONFIGS`.
+
 ### 2. Static asset files
 
 Paper and poster files are served from the repository under:
 
-- `site/Papers/`
-- `site/Posters/`
+- `site/Papers/<year>/`
+- `site/Posters/<year>/`
 
 The runtime code builds links to those files with `buildAssetHref(...)`.
 
 Important details:
 
-- If the Google Sheet already provides a path, the site uses that path after normalizing the filename.
-- If the sheet field is blank, the site falls back to `First_Last.pdf`.
+- If the Google Sheet already provides a path, the site uses that path after normalizing the filename within the selected year's directory.
+- If the sheet field is blank, the site falls back to `First_Last.pdf` within the selected year's directory.
 - Poster references ending in `.png` are normalized to `.pdf`, because the stored poster assets are PDFs.
 - When hosted on Read the Docs, links resolve under the deployed docs path.
 - When opened locally as a file, links resolve with relative `../Papers/...` and `../Posters/...` paths.
@@ -74,7 +78,7 @@ All page logic lives in `site/index.html`.
 
 At load time, the browser does the following:
 
-1. Loads any cached project payload from `localStorage`.
+1. Loads any cached project payload for the selected year from `localStorage`.
 2. Renders the cached snapshot immediately if available.
 3. Fetches the live project CSV and the award CSVs.
 4. Parses CSV rows in the browser with the inline `parseCSV(...)` function.
@@ -92,6 +96,7 @@ The interactive features are all client-side:
 - cached/offline status pill
 - PDF preview modal for local repo assets
 - background asset existence checks for repo-hosted PDFs
+- year selection between configured project datasets
 
 ## What Read the Docs does
 
@@ -117,8 +122,8 @@ That means:
 
 - `readthedocs.yaml`: RTD deployment config.
 - `site/index.html`: the entire app, including markup, styles, and runtime data logic.
-- `site/Papers/`: committed paper PDFs.
-- `site/Posters/`: committed poster PDFs.
+- `site/Papers/2026/`: committed 2026 paper PDFs.
+- `site/Posters/2026/`: committed 2026 poster PDFs.
 - `site/2026 Symposium Posters/`: helper files for poster processing, including a CSV of poster filenames and compression scripts.
 - `site/2026 RSEF Posters/`: event-specific poster assets.
 
@@ -134,14 +139,20 @@ They are useful as operator staging material, but the deployed site does not rea
 
 ## Updating content
 
-For changes to project metadata:
+For changes to project metadata or awards:
 
-1. Update the underlying Google Sheet tabs that publish the CSV feeds.
+1. Update the corresponding tab in the underlying Google Sheets document.
 2. Reload the site or click the status pill to fetch fresh data.
+
+To add a new year:
+
+1. Add a year entry to `YEAR_CONFIGS` in `site/index.html` with its published primary-project CSV URL, award CSV URLs, and `Papers/<year>` and `Posters/<year>` roots.
+2. Add the year as an option in the header selector.
+3. Put that year's PDFs in the configured paper and poster directories.
 
 For changes to paper or poster files:
 
-1. Replace or add PDFs under `site/Papers/` or `site/Posters/`.
+1. Replace or add PDFs under `site/Papers/<year>/` or `site/Posters/<year>/`.
 2. Commit the asset changes.
 3. Let RTD rebuild so the new files are copied into the deployed site.
 
@@ -161,6 +172,6 @@ Because this is a static site, local development is simple:
 
 ## Operational caveats
 
-- If the Google Sheet schema changes, `rowsToProjects(...)` and the award merge logic may need updates.
+- If a Google Sheet schema changes, `rowsToProjects(...)` and the award merge logic may need updates.
 - If a browser cannot reach Google Sheets, the page falls back to the last cached project payload from `localStorage`.
 - If paper/poster filenames drift from the sheet paths or `First_Last.pdf` fallback convention, links will show as unavailable.

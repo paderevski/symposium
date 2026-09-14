@@ -66,6 +66,16 @@
     width: 6px; height: 6px; border-radius: 50%;
     background: currentColor; opacity: 0.6;
   }
+  .year-select {
+    appearance: auto;
+    padding: 4px 8px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--muted-strong);
+    font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+  .year-select:hover,
+  .year-select:focus { border-color: var(--accent); outline: none; }
   @keyframes pulse {
     0%, 100% { opacity: 0.3; transform: scale(0.9); }
     50%      { opacity: 1;   transform: scale(1.2); }
@@ -485,13 +495,17 @@
             <p class="eyebrow">The Academies of Loudoun · Research Symposium</p>
             <div class="header-row">
                 <h1 class="title">
-                    Research <span class="it">Symposium</span> 2026
+                    Research <span class="it">Symposium</span> <span id="display-year">2026</span>
                 </h1>
                 <button class="status"
                         id="data-status"
                         title="Click to fetch fresh data from the live sheet">
                     <span class="dot"></span><span class="label">snapshot</span>
                 </button>
+                  <select class="year-select" id="year-selector" aria-label="Select symposium year">
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
             </div>
             <p class="sub">
                 Browse student research projects. Search the bar; filter by category, teacher, room, division, or keywords.
@@ -617,8 +631,8 @@
         </div>
 
         <footer class="site">
-            Senior Research Symposium 2026 · The Academies of Loudoun ·
-            Data source: <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv"
+            Senior Research Symposium <span id="footer-year">2026</span> · The Academies of Loudoun ·
+            Data source: <a id="live-sheet-link" href="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv"
     target="_blank"
     rel="noopener">live Google Sheet</a>
         </footer>
@@ -626,8 +640,11 @@
         <script>
 "use strict";
 
-const LIVE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv";
-const AWARD_SOURCES = [
+const YEAR_CONFIGS = {
+  2026: {
+    liveUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=1562415871&single=true&output=csv",
+    assetDirs: { paper: "Papers/2026", poster: "Posters/2026" },
+    awardSources: [
       {
     url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3H37TXNt-HMjXRIQrCtCYBndgpc7eopGgAV4s2DXCSIqLoJfwjDEdNWj8bYqqZZF6BEaM1ZR63TFO/pub?gid=462676461&single=true&output=csv",
     buildAwards: (get) => {
@@ -678,14 +695,17 @@ const AWARD_SOURCES = [
     },
   },
 
-];
-const AWARD_FACET_FAMILIES = ['Symposium', 'RSEF', 'ISEF'];
-const CACHE_KEY = "symposium-projects-cache-v5";
-const BOOKMARKS_KEY = "symposium-project-bookmarks-v1";
-const ASSET_DIRS = {
-  paper: "Papers",
-  poster: "Posters",
+    ],
+  },
+  2027: {
+    liveUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9vm4zjdBSeVo9pf8Ehs6qDSI1dm2nE4RYVXMd9HnX4LXgkV1pJ2S8UGaAZPe9o9fOWLSaoOPXIrAj/pub?gid=1562415871&single=true&output=csv",
+    assetDirs: { paper: "Papers/2027", poster: "Posters/2027" },
+    awardSources: [],
+  },
 };
+const DEFAULT_YEAR = "2026";
+const AWARD_FACET_FAMILIES = ['Symposium', 'RSEF', 'ISEF'];
+const BOOKMARKS_KEY = "symposium-project-bookmarks-v1";
 const assetAvailability = new Map();
 const pendingAssetChecks = new Set();
 let PROJECTS = [];
@@ -706,7 +726,26 @@ const state = {
   loadError: null,
   mobileFiltersOpen: false,
   sortBy: "random",  // random | project_code | title | category | last_name | room
+  year: DEFAULT_YEAR,
 };
+
+function getYearConfig() {
+  return YEAR_CONFIGS[state.year];
+}
+
+function getCacheKey() {
+  return `symposium-projects-cache-v5-${state.year}`;
+}
+
+function syncYearUI() {
+  const config = getYearConfig();
+  document.title = `ACL Research Symposium ${state.year} — Projects`;
+  document.querySelector('meta[name="description"]').content = `Browse student projects from the ACL Research Symposium ${state.year}, including abstracts, awards, categories, and paper and poster links.`;
+  $("#display-year").textContent = state.year;
+  $("#footer-year").textContent = state.year;
+  $("#live-sheet-link").href = config.liveUrl;
+  $("#year-selector").value = state.year;
+}
 
 // ============================================================
 // CSV parser
@@ -768,7 +807,7 @@ function buildAssetHref(kind, value, project) {
   if (!ref) return "";
   if (/^(https?:)?\/\//i.test(ref)) return ref;
   const pathParts = ref.split("/").map(encodeURIComponent).join("/");
-  const assetDir = ASSET_DIRS[kind];
+  const assetDir = getYearConfig().assetDirs[kind];
   const pathname = window.location.pathname || "/";
   const docsBaseMatch = pathname.match(/^\/(en|[a-z]{2}(?:-[A-Z]{2})?)\/([^/]+)(?:\/|$)/);
   if (docsBaseMatch) {
@@ -844,7 +883,7 @@ function combineAwardMaps(...maps) {
 }
 
 async function fetchAwardMap() {
-  const maps = await Promise.all(AWARD_SOURCES.map(async (source) => {
+  const maps = await Promise.all(getYearConfig().awardSources.map(async (source) => {
     try {
       const resp = await fetch(source.url, { cache: "no-store" });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -947,7 +986,7 @@ function formatRelativeAge(ts) {
 
 function loadCachedProjects() {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(getCacheKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.projects) || parsed.projects.length === 0) return null;
@@ -984,7 +1023,7 @@ function isBookmarked(project) {
 
 function saveCachedProjects(projects) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
+    localStorage.setItem(getCacheKey(), JSON.stringify({
       savedAt: Date.now(),
       projects,
     }));
@@ -1012,7 +1051,7 @@ async function fetchLive() {
   renderProjects();
   try {
     const [projectResp, awardMap] = await Promise.all([
-      fetch(LIVE_URL, { cache: "no-store" }),
+      fetch(getYearConfig().liveUrl, { cache: "no-store" }),
       fetchAwardMap(),
     ]);
     if (!projectResp.ok) throw new Error("HTTP " + projectResp.status);
@@ -1565,6 +1604,7 @@ $("#search").addEventListener("input", (e) => {
 $("#clear-all").addEventListener("click", () => {
   state.search = "";
   state.saved.clear();
+  state.awardFamilies.clear();
   state.cats.clear();
   state.teachers.clear();
   state.rooms.clear();
@@ -1584,6 +1624,43 @@ $("#filters-close").addEventListener("click", closeMobileFilters);
 $("#filters-backdrop").addEventListener("click", closeMobileFilters);
 
 $("#data-status").addEventListener("click", fetchLive);
+
+$("#year-selector").addEventListener("change", (e) => {
+  const year = e.target.value;
+  if (!YEAR_CONFIGS[year] || year === state.year) return;
+  state.year = year;
+  state.search = "";
+  state.saved.clear();
+  state.awardFamilies.clear();
+  state.cats.clear();
+  state.teachers.clear();
+  state.rooms.clear();
+  state.divs.clear();
+  state.keywords.clear();
+  state.expanded.clear();
+  state.mobileFiltersOpen = false;
+  state.loadError = null;
+  PROJECTS = [];
+  randomSortRanks = new Map();
+  assetAvailability.clear();
+  pendingAssetChecks.clear();
+  $("#search").value = "";
+  syncYearUI();
+
+  const cachedProjects = loadCachedProjects();
+  if (cachedProjects) {
+    PROJECTS = cachedProjects.projects;
+    rebuildRandomSortRanks(cachedProjects.projects);
+    state.isLoading = false;
+    setStatusPill(
+      'cached',
+      `cached · ${formatRelativeAge(cachedProjects.savedAt || Date.now())}`,
+      'Showing browser-cached data while refreshing in the background.'
+    );
+  }
+  render();
+  fetchLive();
+});
 
 document.body.addEventListener("click", (e) => {
   const bookmarkBtn = e.target.closest("[data-bookmark]");
@@ -1696,6 +1773,7 @@ window.addEventListener('resize', () => {
 // Boot
 // ============================================================
 state.bookmarkedCodes = loadBookmarkedCodes();
+syncYearUI();
 const cachedProjects = loadCachedProjects();
 if (cachedProjects) {
   PROJECTS = cachedProjects.projects;
